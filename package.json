@@ -1,0 +1,14 @@
+{
+  "name": "r-pad",
+  "version": "0.0.1",
+  "description": "Easy R development in the browser",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "keywords": [
+    "R",
+    "statistics"
+  ],
+  "author": "Michael Risse",
+}
