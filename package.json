@@ -11,4 +11,7 @@
     "statistics"
   ],
   "author": "Michael Risse",
+  "dependencies": {
+    "express": "^4.13.4"
+  }
 }

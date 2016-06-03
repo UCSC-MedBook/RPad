@@ -6,6 +6,7 @@ ADD package.json /app/package.json
 RUN npm install
 RUN npm install -g node-dev #for hot reloads during development
 ADD . /app/
+EXPOSE 3000
 
 CMD ["node", "index.js"]
 
