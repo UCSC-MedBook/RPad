@@ -2,6 +2,15 @@ var express = require('express');
 var app = express();
 var Cookies = require("cookies");
 var http = require("http");
+var Docker = require("dockerode");
+
+var docker = new Docker({socketPath: '/var/run/docker.sock'});
+docker.listContainers(function (err, containers) {
+  console.log("ERR", err);
+  containers.forEach(function (containerInfo) {
+    console.log(containerInfo);
+  });
+});
 
 var getUser = function(req, callback){
   var options = {
@@ -41,4 +50,7 @@ app.get('/r-pad', function(req, res) {
   });
 });
 
-app.listen(3000);
+
+var port = 3000;
+console.log("RPad listening on port", port);
+app.listen(port);
