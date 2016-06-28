@@ -3,50 +3,102 @@ var app = express();
 var Cookies = require("cookies");
 var http = require("http");
 var Docker = require("dockerode");
+var _ = require("underscore");
 
-var docker = new Docker({socketPath: '/var/run/docker.sock'});
-docker.listContainers(function (err, containers) {
-  console.log("ERR", err);
-  containers.forEach(function (containerInfo) {
-    console.log(containerInfo);
+var docker = new Docker({
+  socketPath: "/var/run/docker.sock"
+});
+
+var httpProxy = require('http-proxy')
+var proxy = httpProxy.createProxyServer({
+  ignorePath: true
+});
+
+/* Without this function, redirects will not include the necessary r-pad/id/:id prefix */
+var patchResponse = function(req, res){
+  res.oldWriteHead = res.writeHead;
+  res.writeHead = function(statusCode, reason, obj){
+    var oldLocation = res._headers.location;
+    if (oldLocation && !oldLocation.startsWith("/r-pad") ){
+      var newLocation = "r-pad/id/" + req.params.id + oldLocation;
+      console.log("new location", newLocation);
+      res.setHeader("location", newLocation);
+    }
+    res.oldWriteHead(statusCode, reason, obj);
+  };
+}
+
+/* given an RStudio container id determine its URL */
+var findTarget = function(id, callback){
+  var container = docker.getContainer(id);
+  container.inspect(function(err, data){
+    if (err){
+      callback(err);
+      return;
+    } else {
+      //TODO fix this
+      callback(null, "http://localhost:8000/r" + data.Name + ":8787");
+    }
+  })
+};
+
+app.get("/r-pad/id/:id*", function(req, res){
+  patchResponse(req, res);
+  findTarget(req.params.id, function(err, target){
+    var path = req.path;
+    var dest = path.replace(/\/r-pad\/id\/[0-9a-f]*/, target);
+    proxy.web(req, res, {target: dest});
   });
 });
 
-var getUser = function(req, callback){
-  var options = {
-    method: 'GET',
-    host: "telescope",
-    path: '/medbookUser',
-    port: 3000,
-    headers: { 'cookie': req.headers.cookie, },
-    keepAlive: true,
-    keepAliveMsecs: 3600000, // an hour
-  };
+app.post("/r-pad/id/:id*", function(req, res){
+  patchResponse(req, res);
+  findTarget(req.params.id, function(err, target){
+    var path = req.path;
+    var dest = path.replace(/\/r-pad\/id\/[0-9a-f]*/, target);
+    proxy.web(req, res, {target: dest});
+  });
+});
 
-  var medbookUserReq = http.request(options, function(medbookUserRes) {
-    medbookUserRes.setEncoding('utf8');
-    var all = "";
-    medbookUserRes.on("data", function(data) { all += data; });
-    medbookUserRes.on("end", function(data) {
-      if (data != null) all += data;
-      console.log("DATA", all);
-      callback(data);
-    });
-  });
-  medbookUserReq.on("error", function(err) {
-    console.log("ERRR", err);
-  });
-  medbookUserReq.end();
+var createRStudioContainer = function(callback){
+  docker.createContainer({
+    Image: "rocker/rstudio", //TODO specify version here
+    name: "rstudio-instance-" + Date.now(),
+    ExposedPorts: {
+      "8787/tcp": {}
+    }
+  }, callback);
 };
 
 // respond with "hello world" when a GET request is made to the homepage
-app.get('/r-pad', function(req, res) {
-  var cookies = new Cookies(req, res);
-  console.log("COOKIES", cookies);
-//  console.log("GATEWAY TOKEN", cookies.get("gateway_token"));
-  res.send('hello r pad');
-  getUser(req, function(info){
-    console.log("INFO", info);
+app.get('/r-pad/create', function(req, res) {
+//  patchResponse(req, res);
+  createRStudioContainer(function(err, container){
+    if (err){
+      console.error(err);
+      return;
+    } else {
+      container.start(function(err, data){
+        container.inspect(function(err, data){
+          docker.listNetworks(function(err, networks){
+            var medbookDefaultNetwork = _.find(networks, function(network){
+              return network.Name === "medbook_default";
+            });
+            medbookDefaultNetwork = docker.getNetwork(medbookDefaultNetwork.Id);
+            medbookDefaultNetwork.connect({
+              Container: data.Id
+            }, function(err, result){
+              console.log("ERR", err);
+              console.log("RESULT", result);
+              //TODO figure out cleaner way to wait for the server to be ready
+              setTimeout(function(){
+                res.redirect("/r-pad/id/" + container.id);
+              }, 2000);
+            });
+          });
+        });
+      });
+    }
   });
 });
 
