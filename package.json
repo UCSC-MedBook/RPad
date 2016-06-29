@@ -12,6 +12,7 @@
   ],
   "author": "Michael Risse",
   "dependencies": {
+    "body-parser": "^1.15.2",
     "dockerode": "^2.2.10",
     "express": "^4.13.4",
     "http-proxy": "^1.14.0",
