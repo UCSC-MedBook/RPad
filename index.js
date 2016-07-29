@@ -35,8 +35,13 @@ var getUser = function(req, callback){
     var all = "";
     medbookUserRes.on("data", function(data) { all += data; });
     medbookUserRes.on("end", function(data) {
-      if (data != null) all += data;
-      callback(null, JSON.parse(all));
+      if (data != null) {all += data}
+      console.log("ALL", all);
+      if (!all || all === "none"){
+        callback(null, null);
+      } else {
+        callback(null, null);
+      }
     });
   });
   medbookUserReq.on("error", function(err) {
@@ -70,7 +75,9 @@ var createRStudioContainer = function(callback){
 app.get('/r-pad/create', function(req, res) {
   console.log("createing rstudio container based on query params", req.query);
   getUser(req, function(err, user){
-    console.log("user collaborations", user.collaborations);
+    if (user){
+      console.log("user collaborations", user.collaborations);
+    }
     createRStudioContainer(function(err, container){
       if (err){
         console.error(err);
