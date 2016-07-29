@@ -15,7 +15,8 @@ app.use(bodyParser.urlencoded({ extended: false }))
 //app.use(bodyParser.json())
 
 
-
+//TODO should allow this to be configured via env variable
+//and use separate docker host in production
 var docker = new Docker({
   socketPath: "/var/run/docker.sock"
 });
@@ -62,8 +63,15 @@ app.get("/r-pad/id/:id*", function(req, res){
 var createRStudioContainer = function(callback){
   crypto.randomBytes(25, function(err, buffer) {
     var name = buffer.toString('hex');
+    //docs at https://docs.docker.com/engine/reference/api/docker_remote_api_v1.24/#/create-a-container
     docker.createContainer({
       Image: "rocker/rstudio", //TODO specify version here
+      HostConfig: {
+        Binds: ["/home/ubuntu/data://home/rstudio/data:ro"]
+      },
+      Volumes: {
+        "/home/rstudio/data":{}
+      },
       name: "rstudio_" + name,
       ExposedPorts: {
         "8787/tcp": {}
@@ -72,6 +80,7 @@ var createRStudioContainer = function(callback){
   });
 };
 
+//TODO redirect to a post to stop duplicate containers being created from chrome's pre-fetch
 app.get('/r-pad/create', function(req, res) {
   console.log("createing rstudio container based on query params", req.query);
   getUser(req, function(err, user){
